@@ -17,8 +17,8 @@ A sophisticated command-line tool to detect whether an image is AI-generated or 
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd ai-image
+git clone https://github.com/starkbaknet/ai-image-dectector.git
+cd ai-image-detector
 
 # Create virtual environment
 python3 -m venv venv

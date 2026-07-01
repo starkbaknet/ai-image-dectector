@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import re
 import piexif
 import numpy as np
 from PIL import Image, ImageChops, ImageFilter
@@ -16,11 +17,39 @@ warnings.filterwarnings("ignore")
 # ---------------------------------------------------------
 #  METADATA CHECK (C2PA, AI TAGS, MIDJOURNEY, SD, ETC.)
 # ---------------------------------------------------------
+def _extract_metadata_text(exif_data):
+    """Collect searchable text from EXIF values only (not dict keys like 'thumbnail')."""
+    parts = []
+    for ifd in ("0th", "Exif", "GPS", "Interop", "1st"):
+        ifd_dict = exif_data.get(ifd)
+        if not ifd_dict:
+            continue
+        for value in ifd_dict.values():
+            if isinstance(value, bytes):
+                parts.append(value.decode("utf-8", errors="ignore"))
+            elif isinstance(value, (tuple, list)):
+                parts.append(" ".join(str(v) for v in value))
+            else:
+                parts.append(str(value))
+    return " ".join(parts)
+
+
+def _metadata_contains_keyword(text, keyword):
+    """Match keywords in metadata; short terms like 'ai' use word boundaries."""
+    keyword = keyword.lower()
+    if keyword == "ai":
+        return bool(re.search(
+            r"(?<![a-zA-Z])" + re.escape(keyword) + r"(?![a-zA-Z])",
+            text.lower(),
+        ))
+    return keyword in text.lower()
+
+
 def check_metadata(path):
     """Check for AI-related metadata tags"""
     try:
         exif_data = piexif.load(path)
-        all_data = str(exif_data)
+        metadata_text = _extract_metadata_text(exif_data)
 
         keywords = [
             "c2pa", "ai", "generated", "contentauth",
@@ -28,7 +57,7 @@ def check_metadata(path):
             "dalle", "firefly", "gemini", "synthetic"
         ]
 
-        flag = any(k.lower() in all_data.lower() for k in keywords)
+        flag = any(_metadata_contains_keyword(metadata_text, k) for k in keywords)
         return flag, exif_data
     except:
         return False, None
